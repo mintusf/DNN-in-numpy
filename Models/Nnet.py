@@ -13,14 +13,27 @@ def init():  # function to import mnist dataset
     y_test = mnist.test.labels
     return (X_train, y_train, X_test, y_test)
 
-def sigmoid(z):
-    sigm = 1. / (1. + np.exp(-z))
-    return np.array(sigm)
+# Activation functions
+
+def sigmoid(z, derivative=False):
+    out = 1. / (1. + np.exp(-z))
+    if derivative:
+        g = np.multiply(out, 1. - out)
+        return np.array(g)
+    return np.array(out)
 
 
-def sigmoidGradient(z):
-    g = np.multiply(sigmoid(z), 1. - sigmoid(z))
-    return np.array(g)
+def relu(z, derivative=False):
+    if derivative:
+        return np.array(1. * (z > 0))
+    return np.array(1. * (z > 0) * z)
+
+
+def tanh(z, derivative=False):
+    out = np.tanh(z)
+    if derivative:
+        return np.array(1 - out * out)
+    return np.array(out)
 
 
 def randomW(shape):  # uniform Xavier initialization of weights
@@ -65,7 +78,7 @@ class Weights:  # Layer class
 
     def update(self, l_rate):
         self.val -= l_rate * self.grad
-        self.grad_zero
+        self.grad_zero()
 
 
 class NNet:  # DNN model class
@@ -106,7 +119,7 @@ class NNet:  # DNN model class
 
         # output layer
         
-        self.layers.append(Layer(output_lay_size, activ_func,
+        self.layers.append(Layer(output_lay_size, sigmoid,
                            lay_type='Output', lay_no=len(layers_size)
                            + 1, sets_no=self.sets_no))
 
@@ -149,7 +162,7 @@ class NNet:  # DNN model class
         return self.cost
     
     def calc_lossfcn(self, input_y):
-        cost1 = np.sum(np.diag(-1 / self.sets_no
+        cost1 = np.sum(np.diag(-1 / input_y.shape[0]
                        * np.matmul(np.log(self.layers[-1].val_out),
                        input_y.transpose())))
         cost2 = np.sum(np.diag(-1 / self.sets_no * np.matmul(np.log(1
@@ -176,7 +189,7 @@ class NNet:  # DNN model class
                                 + 1].delta,
                                 self.weights[layer.lay_no].val),
                                 np.concatenate((np.zeros((self.sets_no,
-                                1)), sigmoidGradient(layer.val_in)),
+                                1)), sigmoid(layer.val_in,derivative = True)),
                                 axis=1))
             else:
                 layer.delta = \
@@ -184,11 +197,10 @@ class NNet:  # DNN model class
                                 + 1].delta[:, 1:],
                                 self.weights[layer.lay_no].val),
                                 np.concatenate((np.zeros((self.sets_no,
-                                1)), sigmoidGradient(layer.val_in)),
+                                1)), sigmoid(layer.val_in,derivative = True)),
                                 axis=1))
-    def train(self):
-        self.forward_prop()
-        self.back_prop()
+                
+    def weights_update (self):
         for W in self.weights:
             W.grad_zero()
             if self.layers[W.w_no + 1].type != 'Output':
@@ -212,6 +224,13 @@ class NNet:  # DNN model class
             W.grad[:, 1:] += self.reg_lambda * W.val[:, 1:]
             W.grad /= self.sets_no
             W.update(self.learning_rate)
+
+
+    def train(self):
+        self.forward_prop()
+        self.back_prop()
+        self.weights_update()
+
         
     def predict(self, input_X, input_y):  # function used for prediction using learnt model
         ins = []
@@ -255,6 +274,7 @@ def train(  # function for training and visualizing performance
     loss_test_axis = []
     acc_train_axis = []
     acc_test_axis = []
+    iter_axis = []
     labels = np.array([i for i in range(10)])
     y_train_formodel = np.array([y_train[i] == labels for i in
                                 range(y_train.shape[0])])
@@ -264,6 +284,7 @@ def train(  # function for training and visualizing performance
         model.train()
         print(f"                             {model.calc_lossfcn(y_train_formodel)}")
         if i % 10 == 0:
+            iter_axis.append(i)
             [predictions_train, loss_train] = model.predict(X_train,
                     y_train_formodel)
             [predictions_test, loss_test] = model.predict(X_test,
@@ -274,10 +295,11 @@ def train(  # function for training and visualizing performance
             acc_test_axis.append(np.mean(y_test == predictions_test))
             print(f"TRAIN: {loss_train}__TEST: {loss_test}")
             print(f"Train accuracy: {np.mean(y_train==predictions_train)}     Test accuracy: {np.mean(y_test==predictions_test)}")
-            plt.plot(loss_train_axis)
-            plt.plot(loss_test_axis)
+            plt.plot(iter_axis,loss_train_axis)
+            plt.plot(iter_axis,loss_test_axis)
             plt.show()
-    print(f"Final accuracy: {np.mean(y_test==predictions_test)}")
+    if i>10:
+        print(f"Final accuracy: {np.mean(y_test==predictions_test)}")
     return (loss_train_axis, loss_test_axis, acc_train_axis,
             acc_test_axis)
      
