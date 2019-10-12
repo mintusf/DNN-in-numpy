@@ -35,10 +35,13 @@ def tanh(z, derivative=False):
         return np.array(1 - out * out)
     return np.array(out)
 
+# uniform He initialization of weights
 
-def randomW(shape):  # uniform Xavier initialization of weights
+def randomW(shape):  
     epsilon = np.sqrt(6) / np.sqrt(shape[0] + shape[1])
     return np.random.uniform(-epsilon, epsilon, shape)
+
+# Class definition for a layer
 
 class Layer:  # Layer class
 
@@ -64,6 +67,7 @@ class Layer:  # Layer class
     def activate(self):
         self.val_out = self.activ_func(self.val_in)
 
+# Class definition for a weights matrix
         
 class Weights:  # Layer class
 
@@ -80,7 +84,8 @@ class Weights:  # Layer class
         self.val -= l_rate * self.grad
         self.grad_zero()
 
-
+# Class definition for a DNN model
+        
 class NNet:  # DNN model class
 
     def __init__(
@@ -136,6 +141,9 @@ class NNet:  # DNN model class
             if layer.type == 'Input':
                 layer.activate()
             else:
+                
+                # Adding vector of ones for each layer, which represents intercept
+                
                 layer.val_in = \
                     np.matmul(np.concatenate((np.ones((self.X_data.shape[0],
                               1)), self.layers[layer.lay_no
