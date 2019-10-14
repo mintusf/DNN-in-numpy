@@ -15,11 +15,12 @@ if __name__ == '__main__':
     Model is an instance of the NN class. Hyperparameters:
     -> layers_size - vector containing numbers of nodes in hidden layers 
         (any number of layers and nodes is possible)
-    -> reg_lambda - a regularization parameter lambda
-    -> activ_func - an activation function used in hidden layers 
+    -> reg_lambda - the regularization parameter lambda
+    -> activ_func - the activation function used in hidden layers 
         (in output layer, always sigmoid function is used). 
         Possible choices are sigmoid, Relu and tanh.
     -> learning_rate
+    -> drop_prob - the probability of supressing a node in the dropout algorithm
     
     NN.train is a function which trains the model. Hyperparameters are:
     -> steps_no - number of epochs
@@ -33,13 +34,14 @@ if __name__ == '__main__':
         input_lay_size=X_train.shape[1],
         output_lay_size=y_train_formodel.shape[1],
         layers_size=[120,120],
-        reg_lambda=0.1,
+        reg_lambda=0,
+        drop_prob = 0.9,
         activ_func=NN.tanh,
         X=X_train,
         y=y_train_formodel,
-        learning_rate=0.5,
+        learning_rate = 0.5,
         )
     (loss_train, loss_test, acc_train, acc_test) = NN.train(
         Model, steps_no, X_train, y_train, X_test, y_test)
-    im_to_show = 5
+    im_to_show = 10
     NN.pred_val(Model, im_to_show, X_test, y_test)
