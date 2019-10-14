@@ -38,7 +38,7 @@ def tanh(z, derivative=False):
 # uniform He initialization of weights
 
 def randomW(shape):  
-    epsilon = np.sqrt(6) / np.sqrt(shape[0] + shape[1])
+    epsilon = np.sqrt(2) / np.sqrt(shape[1])
     return np.random.uniform(-epsilon, epsilon, shape)
 
 # Class definition for a layer
@@ -60,6 +60,8 @@ class Layer:  # Layer class
         self.val_in = np.zeros((sets_no, self.node_no))
         self.delta = np.zeros((sets_no, self.node_no))
         self.val_out = activ_func(self.val_in)
+        self.val_out_withdropout = activ_func(self.val_in)
+        self.dropout = np.zeros((sets_no, self.node_no))
 
     def feed(self, data):
         self.val_in = data
@@ -94,6 +96,7 @@ class NNet:  # DNN model class
         output_lay_size,
         layers_size,
         reg_lambda,
+        drop_prob,
         activ_func,
         X,
         y,
@@ -103,9 +106,11 @@ class NNet:  # DNN model class
                 axis=1)
         self.y = y
         self.reg_lambda = reg_lambda  # regularization parameter lambda
+        self.drop_prob = drop_prob
         self.learning_rate = learning_rate
         self.layers = []
         self.sets_no = self.X_data.shape[0]
+
 
         # initialization of layers
         # input layer
@@ -136,38 +141,31 @@ class NNet:  # DNN model class
             self.weights.append(Weights((self.layers[lay + 1].node_no,
                                 self.layers[lay].node_no + 1), lay))
             
-    def forward_prop(self):  # function calculating activations of all layers & model's output
+    def forward_prop(self, dropout = True):  # function calculating activations of all layers & model's output
         for layer in self.layers:
             if layer.type == 'Input':
                 layer.activate()
+                layer.val_out_withdropout = layer.val_out
             else:
                 
-                # Adding vector of ones for each layer, which represents intercept
+                # Dropout implementation
                 
+                if layer.type == 'Hidden' and dropout:
+                    
+                    layer.dropout = np.random.randn(self.sets_no, layer.node_no)
+                    layer.dropout = (layer.dropout <= self.drop_prob).astype(int)
+                    layer.val_out_withdropout = layer.val_out * layer.dropout
+                    layer.val_out_withdropout = layer.val_out_withdropout / self.drop_prob
+                    
                 layer.val_in = \
                     np.matmul(np.concatenate((np.ones((self.X_data.shape[0],
                               1)), self.layers[layer.lay_no
-                              - 1].val_out), axis=1),
+                              - 1].val_out_withdropout), axis=1),
                               self.weights[layer.lay_no
                               - 1].val.transpose())
                 layer.activate()
                 
-        # calculating cross-entropy cost function with regularization
-
-        cost1 = np.sum(np.diag(-1 / self.sets_no
-                       * np.matmul(np.log(self.layers[-1].val_out),
-                       self.y.transpose())))
-        cost2 = np.sum(np.diag(-1 / self.sets_no * np.matmul(np.log(1
-                       - self.layers[-1].val_out), (1
-                       - self.y).transpose())))
-        cost_reg = 0
-        for W in self.weights:
-            cost_reg += float(np.matmul(W.val[:, 1:].reshape((-1,
-                              1)).transpose(), W.val[:, 1:
-                              ].reshape((-1, 1))))
-        cost_reg *= self.reg_lambda / 2 / self.sets_no
-        self.cost = cost1 + cost2 + cost_reg
-        return self.cost
+    # calculating cross-entropy cost function with regularization
     
     def calc_lossfcn(self, input_y):
         cost1 = np.sum(np.diag(-1 / input_y.shape[0]
@@ -183,9 +181,12 @@ class NNet:  # DNN model class
                               ].reshape((-1, 1))))
         cost_reg *= self.reg_lambda / 2 / self.sets_no
         self.cost = cost1 + cost2 + cost_reg
-        return self.cost             
-    
-    def back_prop(self):  # function executing back propagation to calculate weights gradient
+        return self.cost              
+ 
+     # function executing back propagation to calculate derivatives of 
+     # lost function with respect to all layers' activations
+
+    def back_prop(self): 
         for layer in reversed(self.layers):
             if layer.type == 'Output':
                 layer.delta = layer.val_out - self.y
@@ -207,25 +208,26 @@ class NNet:  # DNN model class
                                 np.concatenate((np.zeros((self.sets_no,
                                 1)), sigmoid(layer.val_in,derivative = True)),
                                 axis=1))
+            if layer.type == 'Hidden':
+                    layer.dropout = np.concatenate ((np.ones((self.X_data.shape[0],1)),  layer.dropout),axis = 1)
+                    layer.delta = layer.delta * layer.dropout
+                    layer.delta = layer.delta / self.drop_prob
                 
+    # A function updating weights according to calculated gradient with dropout
+          
     def weights_update (self):
         for W in self.weights:
             W.grad_zero()
-            if self.layers[W.w_no + 1].type != 'Output':
-                for i in range(5000):
-                    W.grad = W.grad + np.dot(self.layers[W.w_no
-                            + 1].delta[i, 1:][:, None],
-                            np.concatenate((np.ones((1, 1)),
-                            self.layers[W.w_no].val_out[i, :][None, :
-                            ]), axis=1))
+            if self.layers[W.w_no + 1].type != 'Output':                
+                W.grad = np.dot(self.layers[W.w_no
+                            + 1].delta[:, 1:].T,
+                            np.concatenate((np.ones((self.sets_no, 1)),
+                            self.layers[W.w_no].val_out_withdropout),axis = 1))
             else:
-
-                for i in range(5000):
-                    W.grad = W.grad + np.dot(self.layers[W.w_no
-                            + 1].delta[i, :][:, None],
-                            np.concatenate((np.ones((1, 1)),
-                            self.layers[W.w_no].val_out[i, :][None, :
-                            ]), axis=1))
+                W.grad = np.dot(self.layers[W.w_no
+                            + 1].delta.T,
+                            np.concatenate((np.ones((self.sets_no, 1)),
+                            self.layers[W.w_no].val_out_withdropout),axis = 1))
 
             # regularizated update
 
@@ -239,8 +241,9 @@ class NNet:  # DNN model class
         self.back_prop()
         self.weights_update()
 
+    # function used for prediction using learnt model
         
-    def predict(self, input_X, input_y):  # function used for prediction using learnt model
+    def predict(self, input_X, input_y):  
         ins = []
         outs = []
         for layer in self.layers:
@@ -268,8 +271,10 @@ class NNet:  # DNN model class
             layer.val_out = outs[layer.lay_no]
         return (predictions, cost)
  
+
+# function for training and visualizing performance    
     
-def train(  # function for training and visualizing performance
+def train(  
     model,
     steps_no,
     X_train,
