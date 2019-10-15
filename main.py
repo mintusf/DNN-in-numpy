@@ -21,6 +21,9 @@ if __name__ == '__main__':
         Possible choices are sigmoid, Relu and tanh.
     -> learning_rate
     -> drop_prob - the probability of supressing a node in the dropout algorithm
+    -> beta1 - parameter of momentum algorithm in Adam optimizer
+    -> beta2 - parameter of RMSprop algorithm in Adam optimizer
+    -> optimizer - optimizer algorithm can be chosen between "Grad_desc" or "Adam"
     
     NN.train is a function which trains the model. Hyperparameters are:
     -> steps_no - number of epochs
@@ -29,17 +32,20 @@ if __name__ == '__main__':
     -> im_to_show - number of images to show with predictions
     """
     
-    steps_no = 50
+    steps_no = 1000
     Model = NN.NNet(
         input_lay_size=X_train.shape[1],
         output_lay_size=y_train_formodel.shape[1],
-        layers_size=[120,120],
-        reg_lambda=0,
-        drop_prob = 0.9,
+        layers_size=[300,200],
+        reg_lambda=0.05,
+        drop_prob = 0.95,
         activ_func=NN.tanh,
         X=X_train,
         y=y_train_formodel,
-        learning_rate = 0.5,
+        learning_rate = 0.0001,
+        beta1=0.9,
+        beta2=0.99,
+        optimizer = "Adam",
         )
     (loss_train, loss_test, acc_train, acc_test) = NN.train(
         Model, steps_no, X_train, y_train, X_test, y_test)
