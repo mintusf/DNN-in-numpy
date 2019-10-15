@@ -71,20 +71,28 @@ class Layer:  # Layer class
 
 # Class definition for a weights matrix
         
-class Weights:  # Layer class
+class Weights:
 
     def __init__(self, shape, w_no):
         self.val = randomW(shape)
         self.w_no = w_no
         self.grad = np.zeros(shape)
+        self.weighted_grad = np.zeros(shape)
+        self.weighted_grad_corrected = np.zeros(shape)
+        self.weighted_square = np.zeros(shape)
+        self.weighted_square_corrected = np.zeros(shape)
         self.shape = shape
 
     def grad_zero(self):
         self.grad = np.zeros(self.shape)
 
-    def update(self, l_rate):
-        self.val -= l_rate * self.grad
-        self.grad_zero()
+    def update(self, l_rate,optimizer,epsilon = 10**(-9)):
+        if optimizer=="Grad_desc":
+            self.val -= l_rate * self.grad
+            self.grad_zero()
+        if optimizer =="Adam":
+            self.val -= l_rate * (self.weighted_grad_corrected/np.sqrt(self.weighted_square_corrected + epsilon))
+            self.grad_zero()
 
 # Class definition for a DNN model
         
@@ -101,6 +109,9 @@ class NNet:  # DNN model class
         X,
         y,
         learning_rate,
+        beta1,
+        beta2,
+        optimizer,
         ):
         self.X_data = np.concatenate((np.ones((X.shape[0], 1)), X),
                 axis=1)
@@ -110,6 +121,10 @@ class NNet:  # DNN model class
         self.learning_rate = learning_rate
         self.layers = []
         self.sets_no = self.X_data.shape[0]
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.optimizer = optimizer
+        self.iteration = 1
 
 
         # initialization of layers
@@ -181,7 +196,7 @@ class NNet:  # DNN model class
                               ].reshape((-1, 1))))
         cost_reg *= self.reg_lambda / 2 / self.sets_no
         self.cost = cost1 + cost2 + cost_reg
-        return self.cost              
+        return self.cost            
  
      # function executing back propagation to calculate derivatives of 
      # lost function with respect to all layers' activations
@@ -218,7 +233,7 @@ class NNet:  # DNN model class
     def weights_update (self):
         for W in self.weights:
             W.grad_zero()
-            if self.layers[W.w_no + 1].type != 'Output':                
+            if self.layers[W.w_no + 1].type != 'Output':              
                 W.grad = np.dot(self.layers[W.w_no
                             + 1].delta[:, 1:].T,
                             np.concatenate((np.ones((self.sets_no, 1)),
@@ -233,17 +248,33 @@ class NNet:  # DNN model class
 
             W.grad[:, 1:] += self.reg_lambda * W.val[:, 1:]
             W.grad /= self.sets_no
-            W.update(self.learning_rate)
+            
+            # Implementation of Adam optimizer
+
+            if self.optimizer == "Adam":
+                
+                # Momentum calculation
+                
+                W.weighted_grad = self.beta1 * W.weighted_grad + (1 - self.beta1) * W.grad
+                W.weighted_grad_corrected = W.weighted_grad / (1 - self.beta1 ** self.iteration)
+                
+                # RMSprop calculation
+                
+                W.weighted_square = self.beta2 * W.weighted_square + (1 - self.beta2) * (W.grad ** 2)
+                W.weighted_square_corrected = W.weighted_square / (1 - self.beta2 ** self.iteration)
+                    
+            W.update(self.learning_rate, self.optimizer)
 
 
     def train(self):
         self.forward_prop()
         self.back_prop()
         self.weights_update()
+        self.iteration += 1
 
     # function used for prediction using learnt model
         
-    def predict(self, input_X, input_y):  
+    def predict(self, input_X, input_y):
         ins = []
         outs = []
         for layer in self.layers:
