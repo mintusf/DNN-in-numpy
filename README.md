@@ -2,6 +2,7 @@
 
 Implementation of DNN algorithm with using only the numpy library. Model is trained using batch gradient descent and tested on MNIST dataset achieving 94% accuracy on test set.
 Dropout and L2 are implemented as regularization algorithms. The model is fully scallable, which means that regularization parameter as well as numbers of hidden layers and nodes can be set to any value. 
+Optimizer can be chosen between gradient descent and Adam.
 All functions, including forward propagation, back propagation, cross entropy loss calculation, dropout and training algorithm are written without the tensorflow library. 
 Different activation function can be used: sigmoid, Relu or hyperbolic tangent.
 
@@ -15,6 +16,9 @@ Hyperparameters:
     Possible choices are sigmoid, Relu and tanh.
 -> learning_rate
 -> drop_prob - the probability of supressing a node in the dropout algorithm
+-> beta1 - parameter of momentum algorithm in Adam optimizer
+-> beta2 - parameter of RMSprop algorithm in Adam optimizer
+-> optimizer - optimizer algorithm can be chosen between "Grad_desc" or "Adam"
 
 NN.train is a function which trains the model. Hyperparameters are:
 -> steps_no - number of epochs
